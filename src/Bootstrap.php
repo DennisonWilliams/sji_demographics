@@ -1,9 +1,7 @@
 <?php
 /**
- * Bootstrap custom module skeleton.  This file is an example custom module that can be used
- * to create modules that can be utilized inside the OpenEMR system.  It is NOT intended for
- * production and is intended to serve as the barebone requirements you need to get started
- * writing modules that can be installed and used in OpenEMR.
+ * This module will display a demographics panel in the participant chart
+ * that reflects the demograpics 
  *
  * @package   OpenEMR
  * @link      http://www.open-emr.org
@@ -13,7 +11,7 @@
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
-namespace OpenEMR\Modules\CustomModuleSkeleton;
+namespace OpenEMR\Modules\SJIDemographics;
 
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -22,11 +20,19 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 use OpenEMR\Menu\MenuEvent;
 use OpenEMR\Events\RestApiExtend\RestApiCreateEvent;
+use OpenEMR\Events\PatientDemographics\RenderEvent;
+
+// TODO: we should bail if the sji_intake forms do not exist
+// idealy we should install those forms with this module
+// we might be able to do this in the code below
+require_once('/interface/forms/sji_intake_core_variables/report.php');
+require_once('/interface/forms/sji_intake/report.php');
+require_once('/interface/forms/sji_stride_intake/report.php');
 
 class Bootstrap
 {
     const MODULE_INSTALLATION_PATH = "";
-    const MODULE_NAME = "oe-module-custom-skeleton";
+    const MODULE_NAME = "sji-demographics";
 	/**
 	 * @var EventDispatcherInterface The object responsible for sending and subscribing to events through the OpenEMR system
 	 */
@@ -39,97 +45,208 @@ class Bootstrap
 
 	public function subscribeToEvents()
 	{
-		$this->addGlobalSettings();
-		$this->registerMenuItems();
-		$this->subscribeToApiEvents();
+		$this->eventDispatcher->addListener(
+			RenderEvent::EVENT_SECTION_LIST_RENDER_BEFORE, 
+			[$this, 'addSJIDemographics']);
 	}
 
-	public function addGlobalSettings()
-	{
+	private function getPatientData($pid) {
+		$sql = 'SELECT title,fname,mname,lname,sex from patient_data'.
+		       ' where pid=? ORDER BY id DESC limit 1';
+		$res = sqlStatement($sql, array($pid));
+		return sqlFetchArray($res);
 	}
 
-	public function registerMenuItems()
-	{
-		/**
-		 * @var EventDispatcherInterface $eventDispatcher
-		 * @var array                    $module
-		 * @global                       $eventDispatcher @see ModulesApplication::loadCustomModule
-		 * @global                       $module          @see ModulesApplication::loadCustomModule
-		 */
-		$this->eventDispatcher->addListener(MenuEvent::MENU_UPDATE, [$this, 'addCustomModuleMenuItem']);
+	private function getGender($sex) {
+		$sql = 'SELECT title from list_options where list_id="sex" and option_id=?';
+		$res = sqlStatement($sql, array($sex));
+		$gender = sqlFetchArray($res);
 	}
 
-	public function addCustomModuleMenuItem(MenuEvent $event)
-	{
-	    $menu = $event->getMenu();
-
-	    $menuItem = new \stdClass();
-	    $menuItem->requirement = 0;
-	    $menuItem->target = 'mod';
-	    $menuItem->menu_id = 'mod0';
-	    $menuItem->label = xlt("Custom Module Skeleton");
-	    // TODO: pull the install location into a constant into the codebase so if OpenEMR changes this location it
-        // doesn't break any modules.
-	    $menuItem->url = "/interface/modules/custom_modules/oe-module-custom-skeleton/public/sample-index.php";
-	    $menuItem->children = [];
-
-	    /**
-	     * This defines the Access Control List properties that are required to use this module.
-	     * Several examples are provided
-	     */
-	    $menuItem->acl_req = [];
-
-	    /**
-	     * If you would like to restrict this menu to only logged in users who have access to see all user data
-	     */
-	    //$menuItem->acl_req = ["admin", "users"];
-
-	    /**
-	     * If you would like to restrict this menu to logged in users who can access patient demographic information
-	     */
-	    //$menuItem->acl_req = ["users", "demo"];
-
-
-	    /**
-	     * This menu flag takes a boolean property defined in the $GLOBALS array that OpenEMR populates.
-	     * It allows a menu item to display if the property is true, and be hidden if the property is false
-	     */
-	    //$menuItem->global_req = ["custom_skeleton_module_enable"];
-
-	    /**
-	     * If you want your menu item to allows be shown then leave this property blank.
-	     */
-	    $menuItem->global_req = [];
-
-	    foreach ($menu as $item) {
-		if ($item->menu_id == 'modimg') {
-		    $item->children[] = $menuItem;
-		    break;
-		}
-	    }
-
-	    $event->setMenu($menu);
-
-	    return $event;
+	private function getCoreVariables($pid) {
+		// Get aliases and pronouns
+		$sql = 'SELECT aliases,pronouns from form_sji_intake_core_variables '.
+		'WHERE pid=? ORDER BY date DESC LIMIT 1';
+		$res = sqlStatement($sql, array($pid));
+		return sqlFetchArray($res);
 	}
 
-	public function subscribeToApiEvents() {
-	    $this->eventDispatcher->addListener(RestApiCreateEvent::EVENT_HANDLE, [$this, 'addCustomSkeletonApi']);
-	}
+	// TODO: add js to hide the default demographics "card"
+	public function addSJIDemographics(RenderEvent $event) {
+		$widget = '';
+		if (acl_check('patients', 'demo')) { 
+			$widget .= "<tr>\n<td>\n";
 
-	public function addCustomSkeletonApi(RestApiCreateEvent $event)
-    {
-        $apiController = new CustomSkeletonAPI();
+			// SJI Demographics expand collapse widget
+			$widgetTitle = xl("SJI Participant");
+			$widgetLabel = "intakes";
+			$widgetButtonLabel = '';
+			$widgetButtonLink = "";
+			$widgetButtonClass = "";
+			$linkMethod = "html";
+			$bodyClass = "";
+			$widgetAuth = 0;
+			$fixedWidth = true;
+			expand_collapse_widget(
+			    $widgetTitle,
+			    $widgetLabel,
+			    $widgetButtonLabel,
+			    $widgetButtonLink,
+			    $widgetButtonClass,
+			    $linkMethod,
+			    $bodyClass,
+			    $widgetAuth,
+			    $fixedWidth
+			);
 
-        /**
-         * To see the route definitions @see https://github.com/openemr/openemr/blob/master/_rest_routes.inc.php
-         */
-        $event->addToFHIRRouteMap('GET /fhir/CustomSkeletonResource', [$apiController, 'listResources']);
-        $event->addToFHIRRouteMap('GET /fhir/CustomSkeletonResource/:id', [$apiController, 'getOneResource']);
+			$widget .= "<div id=\"SJI\" >\n<ul class=\"tabNav\">\n";
 
-        /**
-         * Events must ALWAYS be returned
-         */
-        return $event;
-    }
-}
+			// display tabs for: basic participant info,
+			// and all intakes: main, CV, STRIDE
+
+			$widget .= '<li class="current"> <a href="#" id="header_tab_Who"> Who</a></li>'."\n";
+
+			// TODO: data show when it was last updated?
+
+			$query = "select count(*) as ct from form_sji_intake_core_variables where pid=?";
+			$res = sqlStatement($query, array($pid));
+			$cv_rows = sqlFetchArray($res);
+			if (
+				isset($cv_rows['ct']) && 
+				$cv_rows['ct'] > 0 && 
+				acl_check('forms', 'intake')
+			) {
+				$widget .= '<li class="">'.
+					'<a href="#" id="header_tab_CV">Core Variables</a>'.
+					'</li>'."\n";
+			}
+
+			$query = "select count(*) as ct from form_sji_intake where pid=?";
+			$res = sqlStatement($query, array($pid));
+			$intake_rows = sqlFetchArray($res);
+
+			if (
+				isset($intake_rows['ct']) && 
+				$intake_rows['ct'] > 0 && 
+				acl_check('forms', 'intake')
+			) {
+
+				$widget .= '<li class="">'.
+					'<a href="#" id="header_tab_Intake">'.
+					'Intake</a> </li>'."\n";
+			}
+
+			$query = "select count(*) as ct from form_sji_stride_intake where pid=?";
+			$res = sqlStatement($query, array($pid));
+			$stride_rows = sqlFetchArray($res);
+			if (
+				isset($stride_rows['ct']) && 
+				$stride_rows['ct'] > 0 && 
+				acl_check('forms', 'intake')) {
+				$widget .= '<li class="">'.
+					'<a href="#" id="header_tab_Stride">x STRIDE</a>'.
+					'</li>'."\n";
+			}
+
+			$widget .= '</ul>'.
+			  '<div class="tabContainer">'.
+			  '<div class="tab current">'.
+			  '<table border=0 cellpadding=0>'.
+			  '<tbody>';
+
+			// Get name, gender
+			$patient_data = getPatientData($pid);
+			$gender = getGender($patient_data['sex']);
+			$patient_cv = getCoreVariables($pid);
+
+			$widget .= '<tr><td class="label_custom" colspan=1 id="label_title">'.
+				'<span id="label_title">Name:</span></td>'.
+				"\n<td class='text data' colspan=1 id=text_title ";
+
+			if (isset($patient_data['title'])) {
+				$widget .= '>'. $patient_data['title'] .' ';
+
+			}else {
+				$widget .= '>';
+			}
+
+			if (isset($patient_data['fname'])) {
+				$widget .= $patient_data['fname'] .' ';
+			}
+
+			if (isset($patient_data['mname'])) {
+				$widget .= $patient_data['mname'] .' ';
+			}
+
+			if (isset($patient_data['lname'])) {
+				$widget .= $patient_data['lname'];
+			}
+			$widget .= "</td>\n</tr>\n";
+
+			if (isset($patient_cv['aliases'])) {
+				$widget .= "<tr>\n<td class='label_custom' colspan=1 id='label_aliases'>\n";
+				$widget .= "<span id='label_aliases'>". xl('Aliases') .":</span></td>\n".
+				  '<td class="text data" colspan=1 id="text_aliases">';
+				$widget .= $patient_cv['aliases'] ."\n</td>\n</tr>\n";
+			}
+
+			if (isset($patient_cv['pronouns'])) {
+				$widget .= "<tr>\n<td class='label_custom' colspan=1 id='label_pronouns'>\n";
+				$widget .= "<span id='label_pronouns'>". xl('Pronouns') .":</span></td>\n".
+				  '<td class="text data" colspan=1 id="text_pronouns">';
+				$widget .= $patient_cv['pronouns'] ."\n</td>\n</tr>\n";
+			}
+
+			if (isset($gender['title'])) {
+				$widget .= "<tr>\n<td class='label_custom' colspan=1 id='label_sex'>\n";
+				$widget .= "<span id='label_sex'>". xl('Gender') .":</span></td>\n".
+				  '<td class="text data" colspan=1 id="text_gender">';
+				$widget .= $gender['title'] ."\n</td>\n</tr>\n";
+
+			} else if (isset($patient_data['sex'])) {
+				$widget .= "<tr>\n<td class='label_custom' colspan=1 id='label_sex'>\n";
+				$widget .= "<span id='label_sex'>". xl('Gender') .":</span></td>\n".
+				  '<td class="text data" colspan=1 id="text_gender">';
+				$widget .= $patient_data['sex'] ."\n</td>\n</tr>\n";
+			}
+
+			// close of the parent table and div."tab current"
+			$widget .= "</tbody></table></div>\n";
+
+			// create tab for CV
+			if ( isset($cv_rows['ct']) && $cv_rows['ct'] > 0 && acl_check('forms', 'intake')
+			) {
+				$widget .= "<div class='tab'>\n";
+				$widget .= sji_intake_core_variables_reporti_string($pid);
+				$widget .= "</div>\n";
+			}
+
+			// create tab for Intake
+			if (isset($intake_rows['ct']) && $intake_rows['ct'] > 0 && acl_check('forms', 'intake')
+			) {
+				$widget .= "<div class='tab'>\n";
+				$widget .= sji_intake_report_string($pid);
+				$widget .= "</div>\n";
+			}
+
+			// create tab for STRIDE
+			if (isset($stride_rows['ct']) && $stride_rows['ct'] > 0 && acl_check('forms', 'intake')
+			) {
+			   $widget .= "<div class='tab'>\n";
+			   $widget .= sji_stride_intake_report_string($pid);
+			   $widget .= "</div>\n";
+			}
+
+			//close off div.tabContainer and div#SJI
+			$widget .= "</div></div>";
+
+			$widget .= '</div>'.
+				'</div>'.
+				'</div>'.
+				'</td>'.
+				'</tr>';
+			print $widget;
+		} // if the user has patients demo permission
+	} // function
+
+} // class

@@ -1,1 +1,1 @@
-Custom Skeleton Module v1.0.0
+Custom SJI Demographics Module v1.0.0

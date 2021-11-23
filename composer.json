@@ -1,6 +1,6 @@
 {
-  "name": "adunsulag/oe-module-custom-skeleton",
-  "description": "OpenEMR Custom Module Skeleton Starter Project",
+  "name": "DennisonWilliams/sji_demographics",
+  "description": "OpenEMR Custom Demographics Module for SJI",
   "type": "openemr-module",
   "license": "GPL-3.0",
   "authors": [
@@ -8,12 +8,17 @@
       "name": "Stephen Nielson",
       "email": "stephen@nielson.org",
       "role": "Developer"
+    },
+    {
+      "name": "Dennison Williams",
+      "email": "Dennison.Williams@DennisonWilliams.com",
+      "role": "Developer"
     }
   ],
   "keywords": ["openemr", "openemr-module"],
   "minimum-stability": "stable",
   "autoload": {
-    "psr-4": {"OpenEMR\\Modules\\CustomModuleSkeleton\\": "src/"}
+    "psr-4": {"OpenEMR\\Modules\\SJIDemographics\\": "src/"}
   },
   "require": {
     "openemr/oe-module-installer-plugin": "^0.1.0",

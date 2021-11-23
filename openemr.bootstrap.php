@@ -13,7 +13,7 @@
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
-namespace OpenEMR\Modules\CustomModuleSkeleton;
+namespace OpenEMR\Modules\SJIDemographics;
 
 /**
  * @global EventDispatcher $eventDispatcher Injected by the OpenEMR module loader;
