@@ -1,5 +1,5 @@
 {
-  "name": "DennisonWilliams/sji_demographics",
+  "name": "dennison-williams-stjames/sji_demographics",
   "description": "OpenEMR Custom Demographics Module for SJI",
   "type": "openemr-module",
   "license": "GPL-3.0",
@@ -11,7 +11,7 @@
     },
     {
       "name": "Dennison Williams",
-      "email": "Dennison.Williams@DennisonWilliams.com",
+      "email": "Dennison.Williams@stjamesinfirmary.org",
       "role": "Developer"
     }
   ],
